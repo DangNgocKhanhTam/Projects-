@@ -1,12 +1,10 @@
 -- Big project for SQL
 -- Link instruction: https://docs.google.com/spreadsheets/d/1WnBJsZXj_4FDi2DyfLH1jkWtfTridO2icWbWCh7PLs8/edit#gid=0
 
---Lưu ý chung: với Bigquery thì mình có thể groupby, orderby 1,2,3(1,2,3() ở đây là thứ tự của column mà mình select nhé
-
 -- Query 01: calculate total visit, pageview, transaction and revenue for Jan, Feb and March 2017 order by month
 SELECT
-        distinct format_date("%Y%m",parse_date("%Y%m%d",date)) as month, --phần này e k cần distinct, vì ở dưới mình có group by rồi, e group by month lại thành 3 dòng
-        sum(totals.visits) as visits,                                    --tương tự mấy câu dưới nha
+        distinct format_date("%Y%m",parse_date("%Y%m%d",date)) as month,
+        sum(totals.visits) as visits,                                    
         sum(totals.pageviews) as pageviews,
         sum(totals.transactions) as transactions,
         sum(totals.totalTransactionRevenue)/ power(10,6) as revenue
@@ -33,8 +31,6 @@ order by total_visits desc
 
 
 -- Query 3: Revenue by traffic source by week, by month in June 2017
---gặp những bài yêu cầu lấy week và month, highest và shortest thì a sẽ tách làm 2 cte
---mình thứ làm thử 1 cte trước, rồi copy paste làm tiếp những cte khác, rồi mình join hoặc union lại vs nhau = 1 key nào đó
 
 with month_data as(
 SELECT
@@ -68,42 +64,7 @@ select * from week_data
 
 --Query 04: Average number of product pageviews by purchaser type (purchasers vs non-purchasers) in June, July 2017. Note: totals.transactions >=1 for purchaser and totals.transactions is null for non-purchaser
 #standardSQL
-with    pageviews_purchase as (
-select  
-        distinct format_date( '%Y%m',parse_date("%Y%m%d", date)) as month1,
-        (sum(totals.pageviews)/count(distinct fullVisitorId)) as avg_pageviews_purchase
-        
-from   `bigquery-public-data.google_analytics_sample.ga_sessions_2017*`
-where   _table_suffix between '0601' and '0731'
-and     totals.transactions >= 1
-group by month1) ,   
-                                    --ở 3 cte, e ghi là month cũng đc, k gần month1 month2
-pageviews_non_purchase as (
-select  
-        distinct format_date( '%Y%m',parse_date("%Y%m%d", date)) as month2,
-        (sum(totals.pageviews)/count(distinct fullVisitorId)) as  avg_pageviews_non_purchas
-        
-from   `bigquery-public-data.google_analytics_sample.ga_sessions_2017*`
-where   _table_suffix between '0601' and '0731'
-and     totals.transactions is Null
-group by month2  )
 
-SELECT
-        distinct format_date( '%Y%m',parse_date("%Y%m%d", date)) as month3,
-        pageviews_purchase.avg_pageviews_purchase,
-        pageviews_non_purchase.avg_pageviews_non_purchase
-FROM
-        (`bigquery-public-data.google_analytics_sample.ga_sessions_2017*`) as c
-inner join pageviews_non_purchase np
-on         c.month3 = pageviews_non_purchase.month2   --khúc này e ghi c.month3, nó k chạy đc, thì month3 lúc này đang là alias thoi, k phải là 1 field
-inner join pageviews_purchase p                      --nếu đúng thì phải ghi là c.format_date( '%Y%m',parse_date("%Y%m%d", date)) = month2
-on         c.month3 = pageviews_purchase.month1  
-where      _table_suffix between '0601' and '0731'
-group by    month3;
-        
-(em dungf cte de viet ma bi loi, em chay tung cai nho thi chay dc toi khi ghep vao thi chay khong dc) 
---> hình như ở giữa e cte của e k có dấu phẩy, nên k chạy đc á
---đây là câu query của a
 with purchaser_data as(
   select
       format_date("%Y%m",parse_date("%Y%m%d",date)) as month,
@@ -154,21 +115,6 @@ group by month
 -- Query 07: Other products purchased by customers who purchased product "YouTube Men's Vintage Henley" in July 2017. Output should show product name and the quantity was ordered.
 #standardSQL
 
-SELECT 
-        product.v2ProductName as other_purchased_products,
-        sum(product.productQuantity) as quantity
-
-FROM `bigquery-public-data.google_analytics_sample.ga_sessions_201707*`,
-unnest (hits)as hits,
-unnest (product) as product 
-where   product.v2ProductName <> "YouTube Men's Vintage Henley"
-and     product.productRevenue is not null
-group by other_purchased_products
-
-(cau nay ra output khong giong expected output) 
-ah, bài này e chưa hiểu ý đề bài á, bài đang muốn mình tìm ra những sản phẩm (other product) mà được mua bởi những người từng mua sp Youtube
-thì step1 là e sẽ lấy ra list những ng mua sản phẩm Youtube trước, gọi list id này là (1) nha, thì trong list (1) này có những ng chỉ mua youtube
-nhưng cũng có người vừa mua youtube, vừa mua những sản phẩm khác(other product), thì để bài đang muốn mình tìm ra other product, và số lượg của nó
 
 with buyer_list as(
     SELECT
@@ -195,9 +141,6 @@ ORDER BY quantity DESC
 
 --Query 08: Calculate cohort map from pageview to addtocart to purchase in last 3 month. For example, 100% pageview then 40% add_to_cart and 10% purchase.
 #standardSQL
-bỏ qua phần calculate cohort map
-ý bài này là 1 sản phẩm sẽ qua 3 giai đoạn, view -> add_to_cart -> purchare ; thì bài đang muốn mình đang tính đc ở mỗi giai đoạn, số lượng nó rớt còn bao nhiêu %
-thì ý tưởng là e sẽ tạo ra 3 cte tính số liệu của 3 giai đoạn này, rồi sao đó ghép vs nhau thành 1 data thống nhất. thì điểm chung là thời gian, nên mình sẽ dùng time để mapping các cte lại
 
 with
 product_view as(
@@ -248,7 +191,7 @@ join purchase p on pv.month = p.month
 order by pv.month
 
 
-Cách 2: bài này mình có thể dùng count(case when) hoặc sum(case when)
+Cách 2: 
 
 with product_data as(
 select
