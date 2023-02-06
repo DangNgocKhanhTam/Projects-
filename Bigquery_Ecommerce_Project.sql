@@ -12,7 +12,7 @@ FROM
         `bigquery-public-data.google_analytics_sample.ga_sessions_2017*`
 where   _table_suffix between '0101' and '0331'
 group by month --group by 1
-order by month  --order by 1    ---tương tự mấy phần dưới nha
+order by month  --order by 1    
 
 
 
